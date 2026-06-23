@@ -1,589 +1,887 @@
-// Game Engine - TopTop Monopoly
-class MonopolyGame {
-    constructor() {
-        this.gameId = null;
-        this.playerId = null;
-        this.players = [];
-        this.board = this.createBoard();
-        this.chanceCards = this.createChanceCards();
-        this.kaznaCards = this.createKaznaCards();
-        this.gameState = null;
-        this.unsubscribe = null;
+// ============ ИГРОВОЙ ДВИЖОК ============
+
+// Константы
+const BOARD_SIZE = 28;
+const MAX_ROUNDS = 28;
+const START_MONEY = 3000;
+const PASS_GO_MONEY = 200;
+
+// Типы клеток
+const CELL_TYPES = {
+    START: 'start',
+    PROPERTY: 'property',
+    CHANCE: 'chance',
+    CHEST: 'chest',
+    TAX: 'tax',
+    JAIL: 'jail',
+    FREE: 'free',
+    GO_TO_JAIL: 'go_to_jail',
+    RAILROAD: 'railroad',
+    UTILITY: 'utility'
+};
+
+// Цвета групп свойств
+const GROUP_COLORS = {
+    purple: '#a855f7',
+    yellow: '#f59e0b',
+    pink: '#ec4899',
+    blue: '#3b82f6',
+    green: '#22c55e',
+    red: '#ef4444'
+};
+
+// Определение клеток поля (28 клеток)
+const BOARD_CELLS = [
+    { id: 0, type: CELL_TYPES.START, name: 'СТАРТ', icon: 'GO' },
+    { id: 1, type: CELL_TYPES.PROPERTY, name: 'Ул. Пушкина', price: 100, group: 'purple', icon: '🏠' },
+    { id: 2, type: CELL_TYPES.CHEST, name: 'Казна', icon: '💰' },
+    { id: 3, type: CELL_TYPES.PROPERTY, name: 'Ул. Лермонтова', price: 100, group: 'purple', icon: '🏠' },
+    { id: 4, type: CELL_TYPES.TAX, name: 'Налог', price: 200, icon: '💸' },
+    { id: 5, type: CELL_TYPES.RAILROAD, name: 'Ж/д Вокзал', price: 200, icon: '🚂' },
+    { id: 6, type: CELL_TYPES.PROPERTY, name: 'Проспект Мира', price: 150, group: 'yellow', icon: '🏢' },
+    { id: 7, type: CELL_TYPES.CHANCE, name: 'Шанс', icon: '❓' },
+    { id: 8, type: CELL_TYPES.PROPERTY, name: 'Ул. Гоголя', price: 150, group: 'yellow', icon: '🏢' },
+    { id: 9, type: CELL_TYPES.PROPERTY, name: 'Проспект Ленина', price: 180, group: 'yellow', icon: '🏢' },
+    { id: 10, type: CELL_TYPES.JAIL, name: 'Тюрьма', icon: '🚔' },
+    { id: 11, type: CELL_TYPES.PROPERTY, name: 'Ул. Чехова', price: 200, group: 'pink', icon: '🏨' },
+    { id: 12, type: CELL_TYPES.UTILITY, name: 'Электро', price: 150, icon: '⚡' },
+    { id: 13, type: CELL_TYPES.PROPERTY, name: 'Ул. Толстого', price: 220, group: 'pink', icon: '🏨' },
+    { id: 14, type: CELL_TYPES.PROPERTY, name: 'Проспект Победы', price: 240, group: 'pink', icon: '🏨' },
+    { id: 15, type: CELL_TYPES.RAILROAD, name: 'Ж/д Станция', price: 200, icon: '🚂' },
+    { id: 16, type: CELL_TYPES.PROPERTY, name: 'Ул. Достоевского', price: 260, group: 'blue', icon: '🏰' },
+    { id: 17, type: CELL_TYPES.CHANCE, name: 'Шанс', icon: '❓' },
+    { id: 18, type: CELL_TYPES.PROPERTY, name: 'Проспект Надежды', price: 280, group: 'blue', icon: '🏰' },
+    { id: 19, type: CELL_TYPES.PROPERTY, name: 'Ул. Солнца', price: 300, group: 'blue', icon: '🏰' },
+    { id: 20, type: CELL_TYPES.FREE, name: 'Парковка', icon: '🅿️' },
+    { id: 21, type: CELL_TYPES.PROPERTY, name: 'Ул. Весны', price: 320, group: 'green', icon: '🌳' },
+    { id: 22, type: CELL_TYPES.CHEST, name: 'Казна', icon: '💰' },
+    { id: 23, type: CELL_TYPES.PROPERTY, name: 'Проспект Героев', price: 340, group: 'green', icon: '🌳' },
+    { id: 24, type: CELL_TYPES.PROPERTY, name: 'Ул. Мечты', price: 360, group: 'green', icon: '🌳' },
+    { id: 25, type: CELL_TYPES.RAILROAD, name: 'Ж/д Депо', price: 200, icon: '🚂' },
+    { id: 26, type: CELL_TYPES.PROPERTY, name: 'Ул. Королей', price: 400, group: 'red', icon: '👑' },
+    { id: 27, type: CELL_TYPES.GO_TO_JAIL, name: 'В тюрьму', icon: '🚓' },
+];
+
+// Карты Шанс
+const CHANCE_CARDS = [
+    { text: 'Пройдите на СТАРТ', action: 'move', target: 0 },
+    { text: 'Банк ошибся в вашу пользу. Получите $200', action: 'money', amount: 200 },
+    { text: 'Заплатите штраф $50', action: 'money', amount: -50 },
+    { text: 'Перейдите в Тюрьму', action: 'jail' },
+    { text: 'Получите $100 за хорошую оценку', action: 'money', amount: 100 },
+    { text: 'Заплатите налог $75', action: 'money', amount: -75 },
+    { text: 'Перейдите на ближайшую Ж/д', action: 'nearest', type: 'railroad' },
+    { text: 'Вас ограбили! Потеряйте $100', action: 'money', amount: -100 },
+];
+
+// Карты Казны
+const CHEST_CARDS = [
+    { text: 'Наследство! Получите $100', action: 'money', amount: 100 },
+    { text: 'Продажа акций. Получите $50', action: 'money', amount: 50 },
+    { text: 'Штраф за превышение $25', action: 'money', amount: -25 },
+    { text: 'Вернуть долг $150', action: 'money', amount: -150 },
+    { text: 'Лотерея! Получите $200', action: 'money', amount: 200 },
+    { text: 'Страховка. Получите $20', action: 'money', amount: 20 },
+    { text: 'Больничный счёт $100', action: 'money', amount: -100 },
+    { text: 'День рождения! Получите $10 от каждого', action: 'birthday', amount: 10 },
+];
+
+// ============ СОСТОЯНИЕ ИГРЫ ============
+let gameState = {
+    roomId: null,
+    players: [],
+    currentPlayer: 0,
+    round: 1,
+    board: [],
+    dice: [1, 1],
+    doublesCount: 0,
+    gameOver: false,
+    myId: null,
+    isHost: false
+};
+
+let roomUnsubscribe = null;
+
+// ============ ИНИЦИАЛИЗАЦИЯ ПОЛЯ ============
+function initBoard() {
+    const board = document.getElementById('game-board');
+    if (!board) return;
+    board.innerHTML = '';
+
+    const size = 340;
+    const cellSize = 42;
+    const gap = 4;
+    const cols = 8;
+    const rows = 8;
+
+    // Расположение клеток по периметру (28 клеток)
+    const positions = [];
+    // Верхняя сторона (8 клеток)
+    for (let i = 0; i < 8; i++) {
+        positions.push({ x: i * (cellSize + gap), y: 0 });
+    }
+    // Правая сторона (6 клеток, без углов)
+    for (let i = 1; i < 7; i++) {
+        positions.push({ x: 7 * (cellSize + gap), y: i * (cellSize + gap) });
+    }
+    // Нижняя сторона (8 клеток, справа налево)
+    for (let i = 7; i >= 0; i--) {
+        positions.push({ x: i * (cellSize + gap), y: 7 * (cellSize + gap) });
+    }
+    // Левая сторона (6 клеток, снизу вверх, без углов)
+    for (let i = 6; i > 0; i--) {
+        positions.push({ x: 0, y: i * (cellSize + gap) });
     }
 
-    // 28 клеток поля
-    createBoard() {
-        return [
-            { id: 0, name: 'СТАРТ', type: 'start', price: 0 },
-            { id: 1, name: 'Малая улица', type: 'property', price: 60, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, color: 'brown' },
-            { id: 2, name: 'Казна', type: 'kazna', price: 0 },
-            { id: 3, name: 'Большая улица', type: 'property', price: 60, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, color: 'brown' },
-            { id: 4, name: 'Подоходный налог', type: 'tax', price: 200 },
-            { id: 5, name: 'Ж/д Станция', type: 'railroad', price: 200, rent: [25, 50, 100, 200] },
-            { id: 6, name: 'Аллея', type: 'property', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, color: 'lightblue' },
-            { id: 7, name: 'Шанс', type: 'chance', price: 0 },
-            { id: 8, name: 'Проспект', type: 'property', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, color: 'lightblue' },
-            { id: 9, name: 'Бульвар', type: 'property', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, color: 'lightblue' },
-            { id: 10, name: 'ТЮРЬМА', type: 'jail', price: 0 },
-            { id: 11, name: 'Парк', type: 'property', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, color: 'pink' },
-            { id: 12, name: 'Электростанция', type: 'utility', price: 150, rent: [4, 10] },
-            { id: 13, name: 'Сад', type: 'property', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, color: 'pink' },
-            { id: 14, name: 'Площадь', type: 'property', price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, color: 'pink' },
-            { id: 15, name: 'Ж/д Вокзал', type: 'railroad', price: 200, rent: [25, 50, 100, 200] },
-            { id: 16, name: 'Набережная', type: 'property', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, color: 'orange' },
-            { id: 17, name: 'Казна', type: 'kazna', price: 0 },
-            { id: 18, name: 'Набережная 2', type: 'property', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, color: 'orange' },
-            { id: 19, name: 'Порт', type: 'property', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, color: 'orange' },
-            { id: 20, name: 'БЕСПЛАТНАЯ ПАРКОВКА', type: 'parking', price: 0 },
-            { id: 21, name: 'Улица 1', type: 'property', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, color: 'red' },
-            { id: 22, name: 'Шанс', type: 'chance', price: 0 },
-            { id: 23, name: 'Улица 2', type: 'property', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, color: 'red' },
-            { id: 24, name: 'Улица 3', type: 'property', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, color: 'red' },
-            { id: 25, name: 'Ж/д Депо', type: 'railroad', price: 200, rent: [25, 50, 100, 200] },
-            { id: 26, name: 'Проспект 1', type: 'property', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, color: 'yellow' },
-            { id: 27, name: 'Проспект 2', type: 'property', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, color: 'yellow' },
-            { id: 28, name: 'Водоканал', type: 'utility', price: 150, rent: [4, 10] },
-            { id: 29, name: 'Проспект 3', type: 'property', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, color: 'yellow' },
-            { id: 30, name: 'ИДИ В ТЮРЬМУ', type: 'gojail', price: 0 },
-            { id: 31, name: 'Авеню', type: 'property', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, color: 'green' },
-            { id: 32, name: 'Авеню 2', type: 'property', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, color: 'green' },
-            { id: 33, name: 'Казна', type: 'kazna', price: 0 },
-            { id: 34, name: 'Авеню 3', type: 'property', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, color: 'green' },
-            { id: 35, name: 'Ж/д Терминал', type: 'railroad', price: 200, rent: [25, 50, 100, 200] },
-            { id: 36, name: 'Шанс', type: 'chance', price: 0 },
-            { id: 37, name: 'Площадь 1', type: 'property', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, color: 'blue' },
-            { id: 38, name: 'Роскошный налог', type: 'tax', price: 100 },
-            { id: 39, name: 'Площадь 2', type: 'property', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, color: 'blue' }
-        ];
-    }
+    BOARD_CELLS.forEach((cell, index) => {
+        const pos = positions[index];
+        const el = document.createElement('div');
+        el.className = 'cell';
+        el.dataset.cellId = cell.id;
 
-    createChanceCards() {
-        return [
-            { text: 'Пройдите на СТАРТ', action: 'move', target: 0 },
-            { text: 'Банковская ошибка в вашу пользу. Получите 200', action: 'money', amount: 200 },
-            { text: 'Заплатите штраф 50', action: 'money', amount: -50 },
-            { text: 'Вы выиграли кроссворд. Получите 100', action: 'money', amount: 100 },
-            { text: 'Идите в тюрьму', action: 'jail' },
-            { text: 'Возврат налога. Получите 20', action: 'money', amount: 20 },
-            { text: 'С днём рождения! Получите 10 от каждого', action: 'birthday', amount: 10 },
-            { text: 'Страховка выплачена. Получите 100', action: 'money', amount: 100 },
-            { text: 'Оплатите больничные 100', action: 'money', amount: -100 },
-            { text: 'Школьные взносы 150', action: 'money', amount: -150 },
-            { text: 'Получите 25 за консультацию', action: 'money', amount: 25 },
-            { text: 'Улица ремонт. Заплатите 40 за дом', action: 'repair', perHouse: 40 },
-            { text: 'Вы 2-е в конкурсе красоты. Получите 10', action: 'money', amount: 10 },
-            { text: 'Наследство 100', action: 'money', amount: 100 },
-            { text: 'Займ банку 150', action: 'money', amount: -150 },
-            { text: 'Премия 50', action: 'money', amount: 50 }
-        ];
-    }
+        // Определяем класс цвета
+        if (cell.group) {
+            el.classList.add(`cell-${cell.group}`);
+        } else if (cell.type === CELL_TYPES.START) {
+            el.classList.add('cell-green');
+        } else if (cell.type === CELL_TYPES.JAIL || cell.type === CELL_TYPES.GO_TO_JAIL) {
+            el.classList.add('cell-red');
+        } else if (cell.type === CELL_TYPES.CHANCE || cell.type === CELL_TYPES.CHEST) {
+            el.classList.add('cell-yellow');
+        } else if (cell.type === CELL_TYPES.RAILROAD) {
+            el.classList.add('cell-purple');
+        } else if (cell.type === CELL_TYPES.UTILITY) {
+            el.classList.add('cell-blue');
+        } else {
+            el.classList.add('cell-white');
+        }
 
-    createKaznaCards() {
-        return [
-            { text: 'Выход из тюрьмы (карта)', action: 'jailcard' },
-            { text: 'Ошибка банка. Получите 200', action: 'money', amount: 200 },
-            { text: 'Продажа акций. Получите 50', action: 'money', amount: 50 },
-            { text: 'Курсы. Заплатите 50', action: 'money', amount: -50 },
-            { text: 'День рождения. Получите 10 от каждого', action: 'birthday', amount: 10 },
-            { text: 'Наследство 100', action: 'money', amount: 100 },
-            { text: 'Возврат долга 20', action: 'money', amount: 20 },
-            { text: 'Страховка 100', action: 'money', amount: 100 },
-            { text: 'Больница 50', action: 'money', amount: -50 },
-            { text: 'Школа 50', action: 'money', amount: -50 },
-            { text: 'Консультация 25', action: 'money', amount: 25 },
-            { text: 'Ремонт 40 за дом', action: 'repair', perHouse: 40 },
-            { text: 'Конкурс 10', action: 'money', amount: 10 },
-            { text: 'Наследство 100', action: 'money', amount: 100 },
-            { text: 'Займ 150', action: 'money', amount: -150 },
-            { text: 'Премия 50', action: 'money', amount: 50 }
-        ];
-    }
+        el.style.left = `${pos.x}px`;
+        el.style.top = `${pos.y}px`;
 
-    async createGame(playerName, skin = 'hat') {
-        const gameId = 'game_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-        const playerId = 'player_' + Date.now();
+        el.innerHTML = `
+            <span class="cell-icon">${cell.icon}</span>
+            <span class="cell-price">${cell.price || ''}</span>
+        `;
 
-        const gameData = {
-            id: gameId,
+        board.appendChild(el);
+    });
+}
+
+// ============ СОЗДАНИЕ КОМНАТЫ ============
+function createRoom() {
+    const mode = document.getElementById('game-mode')?.value || 'monopoly';
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    gameState.roomId = roomId;
+    gameState.isHost = true;
+    gameState.myId = generatePlayerId();
+
+    const player = createPlayer(gameState.myId, 'Вы', true);
+    gameState.players = [player];
+
+    // Сохраняем в Firestore
+    if (window.db) {
+        window.db.collection('games').doc(roomId).set({
+            roomId: roomId,
+            mode: mode,
             status: 'waiting',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            currentPlayer: 0,
             round: 1,
-            maxRounds: 28,
-            players: {
-                [playerId]: {
-                    id: playerId,
-                    name: playerName,
-                    skin: skin,
-                    money: 1500,
-                    position: 0,
-                    properties: [],
-                    houses: {},
-                    inJail: false,
-                    jailTurns: 0,
-                    jailCards: 0,
-                    bankrupt: false,
-                    doubles: 0,
-                    isBot: false
-                }
-            },
-            turnOrder: [playerId],
-            chat: [],
-            turnTimer: null,
-            lastRoll: null,
-            boardState: {},
-            chanceDeck: this.shuffleArray([...Array(16).keys()]),
-            kaznaDeck: this.shuffleArray([...Array(16).keys()]),
-            chanceIndex: 0,
-            kaznaIndex: 0
-        };
-
-        await db.collection('games').doc(gameId).set(gameData);
-        this.gameId = gameId;
-        this.playerId = playerId;
-        return { gameId, playerId };
-    }
-
-    async joinGame(gameId, playerName, skin = 'hat') {
-        const gameRef = db.collection('games').doc(gameId);
-        const gameDoc = await gameRef.get();
-
-        if (!gameDoc.exists) throw new Error('Игра не найдена');
-
-        const gameData = gameDoc.data();
-        if (gameData.status !== 'waiting') throw new Error('Игра уже началась');
-        if (Object.keys(gameData.players).length >= 4) throw new Error('Игра заполнена');
-
-        const playerId = 'player_' + Date.now();
-        const playerData = {
-            id: playerId,
-            name: playerName,
-            skin: skin,
-            money: 1500,
-            position: 0,
-            properties: [],
-            houses: {},
-            inJail: false,
-            jailTurns: 0,
-            jailCards: 0,
-            bankrupt: false,
-            doubles: 0,
-            isBot: false
-        };
-
-        await gameRef.update({
-            [`players.${playerId}`]: playerData,
-            turnOrder: firebase.firestore.FieldValue.arrayUnion(playerId)
+            currentPlayer: 0,
+            players: gameState.players,
+            board: BOARD_CELLS.map(c => ({ ...c, owner: null, houses: 0 })),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+            showRoomInfo(roomId);
+            listenToRoom(roomId);
+        }).catch(err => {
+            console.error('Error creating room:', err);
+            showToast('Ошибка создания комнаты');
         });
-
-        this.gameId = gameId;
-        this.playerId = playerId;
-        return { gameId, playerId };
-    }
-
-    async startGame() {
-        if (!this.gameId) return;
-        await db.collection('games').doc(this.gameId).update({
-            status: 'playing',
-            startedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    }
-
-    subscribeToGame(callback) {
-        if (!this.gameId) return;
-        this.unsubscribe = db.collection('games').doc(this.gameId)
-            .onSnapshot(doc => {
-                if (doc.exists) {
-                    this.gameState = doc.data();
-                    callback(this.gameState);
-                }
-            });
-    }
-
-    unsubscribeFromGame() {
-        if (this.unsubscribe) {
-            this.unsubscribe();
-            this.unsubscribe = null;
-        }
-    }
-
-    async rollDice() {
-        if (!this.gameState || this.gameState.status !== 'playing') return null;
-
-        const currentPlayerId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        if (currentPlayerId !== this.playerId) return null;
-
-        const dice1 = Math.floor(Math.random() * 6) + 1;
-        const dice2 = Math.floor(Math.random() * 6) + 1;
-        const isDouble = dice1 === dice2;
-        const total = dice1 + dice2;
-
-        await this.addToLog(`${this.gameState.players[currentPlayerId].name} бросает ${dice1}+${dice2}`);
-
-        return { dice1, dice2, total, isDouble };
-    }
-
-    async movePlayer(diceResult) {
-        const currentPlayerId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        const player = this.gameState.players[currentPlayerId];
-
-        let newPosition = (player.position + diceResult.total) % 40;
-        let passedGo = player.position + diceResult.total >= 40;
-        let doubles = diceResult.isDouble ? player.doubles + 1 : 0;
-        let inJail = player.inJail;
-        let jailTurns = player.jailTurns;
-
-        // 3 дубля = тюрьма
-        if (doubles >= 3) {
-            newPosition = 10;
-            inJail = true;
-            jailTurns = 3;
-            doubles = 0;
-            await this.addToLog(`${player.name} попадает в тюрьму за 3 дубля!`);
-        } else if (diceResult.isDouble && player.inJail) {
-            // Дубль выходит из тюрьмы
-            inJail = false;
-            jailTurns = 0;
-            await this.addToLog(`${player.name} выходит из тюрьмы по дублю!`);
-        }
-
-        // Прошли СТАРТ
-        if (passedGo && !player.inJail) {
-            await this.updatePlayerMoney(currentPlayerId, 200);
-            await this.addToLog(`${player.name} получает 200 за проход СТАРТ`);
-        }
-
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${currentPlayerId}.position`]: newPosition,
-            [`players.${currentPlayerId}.doubles`]: doubles,
-            [`players.${currentPlayerId}.inJail`]: inJail,
-            [`players.${currentPlayerId}.jailTurns`]: jailTurns,
-            lastRoll: diceResult
-        });
-
-        return newPosition;
-    }
-
-    async handleCellLanding(position) {
-        const cell = this.board[position];
-        const currentPlayerId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        const player = this.gameState.players[currentPlayerId];
-
-        switch (cell.type) {
-            case 'start':
-                await this.updatePlayerMoney(currentPlayerId, 200);
-                break;
-            case 'property':
-            case 'railroad':
-            case 'utility':
-                await this.handlePropertyLanding(cell, currentPlayerId);
-                break;
-            case 'chance':
-                await this.drawChance(currentPlayerId);
-                break;
-            case 'kazna':
-                await this.drawKazna(currentPlayerId);
-                break;
-            case 'tax':
-                await this.updatePlayerMoney(currentPlayerId, -cell.price);
-                await this.addToLog(`${player.name} платит налог ${cell.price}`);
-                break;
-            case 'jail':
-                await this.addToLog(`${player.name} посетил тюрьму`);
-                break;
-            case 'gojail':
-                await this.sendToJail(currentPlayerId);
-                break;
-            case 'parking':
-                await this.addToLog(`${player.name} на бесплатной парковке`);
-                break;
-        }
-    }
-
-    async handlePropertyLanding(cell, playerId) {
-        const boardState = this.gameState.boardState || {};
-        const ownerId = boardState[cell.id]?.owner;
-        const player = this.gameState.players[playerId];
-
-        if (!ownerId) {
-            // Свободная - предложить купить
-            window.dispatchEvent(new CustomEvent('offer-buy', { 
-                detail: { cell, playerId, price: cell.price } 
-            }));
-        } else if (ownerId !== playerId) {
-            // Заплатить аренду
-            const rent = this.calculateRent(cell, ownerId);
-            await this.updatePlayerMoney(playerId, -rent);
-            await this.updatePlayerMoney(ownerId, rent);
-            await this.addToLog(`${player.name} платит аренду ${rent} ${this.gameState.players[ownerId].name}`);
-        }
-    }
-
-    calculateRent(cell, ownerId) {
-        const boardState = this.gameState.boardState || {};
-        const cellState = boardState[cell.id] || {};
-
-        if (cell.type === 'property') {
-            const houses = cellState.houses || 0;
-            return cell.rent[houses];
-        } else if (cell.type === 'railroad') {
-            const railroads = Object.values(boardState).filter(c => 
-                c.owner === ownerId && this.board[c.cellId]?.type === 'railroad'
-            ).length;
-            return cell.rent[Math.min(railroads - 1, 3)];
-        } else if (cell.type === 'utility') {
-            const utilities = Object.values(boardState).filter(c => 
-                c.owner === ownerId && this.board[c.cellId]?.type === 'utility'
-            ).length;
-            const multiplier = utilities === 2 ? 10 : 4;
-            return (this.gameState.lastRoll?.total || 0) * multiplier;
-        }
-        return 0;
-    }
-
-    async buyProperty(cellId) {
-        const currentPlayerId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        const player = this.gameState.players[currentPlayerId];
-        const cell = this.board[cellId];
-
-        if (player.money < cell.price) return false;
-
-        await this.updatePlayerMoney(currentPlayerId, -cell.price);
-        await db.collection('games').doc(this.gameId).update({
-            [`boardState.${cellId}`]: { owner: currentPlayerId, cellId: cellId, houses: 0 },
-            [`players.${currentPlayerId}.properties`]: firebase.firestore.FieldValue.arrayUnion(cellId)
-        });
-        await this.addToLog(`${player.name} купил ${cell.name} за ${cell.price}`);
-        return true;
-    }
-
-    async buildHouse(cellId) {
-        const currentPlayerId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        const player = this.gameState.players[currentPlayerId];
-        const cell = this.board[cellId];
-        const boardState = this.gameState.boardState || {};
-        const cellState = boardState[cellId] || {};
-
-        if (cellState.houses >= 5) return false;
-        if (player.money < cell.houseCost) return false;
-
-        await this.updatePlayerMoney(currentPlayerId, -cell.houseCost);
-        await db.collection('games').doc(this.gameId).update({
-            [`boardState.${cellId}.houses`]: (cellState.houses || 0) + 1
-        });
-        await this.addToLog(`${player.name} строит дом на ${cell.name}`);
-        return true;
-    }
-
-    async drawChance(playerId) {
-        const deck = this.gameState.chanceDeck || [...Array(16).keys()];
-        const index = this.gameState.chanceIndex || 0;
-        const card = this.chanceCards[deck[index % 16]];
-
-        await this.addToLog(`Шанс: ${card.text}`);
-        await this.executeCard(card, playerId);
-
-        await db.collection('games').doc(this.gameId).update({
-            chanceIndex: (index + 1) % 16
-        });
-    }
-
-    async drawKazna(playerId) {
-        const deck = this.gameState.kaznaDeck || [...Array(16).keys()];
-        const index = this.gameState.kaznaIndex || 0;
-        const card = this.kaznaCards[deck[index % 16]];
-
-        await this.addToLog(`Казна: ${card.text}`);
-        await this.executeCard(card, playerId);
-
-        await db.collection('games').doc(this.gameId).update({
-            kaznaIndex: (index + 1) % 16
-        });
-    }
-
-    async executeCard(card, playerId) {
-        const player = this.gameState.players[playerId];
-
-        switch (card.action) {
-            case 'move':
-                await db.collection('games').doc(this.gameId).update({
-                    [`players.${playerId}.position`]: card.target
-                });
-                if (card.target === 10) await this.sendToJail(playerId);
-                break;
-            case 'money':
-                await this.updatePlayerMoney(playerId, card.amount);
-                break;
-            case 'jail':
-                await this.sendToJail(playerId);
-                break;
-            case 'jailcard':
-                await db.collection('games').doc(this.gameId).update({
-                    [`players.${playerId}.jailCards`]: firebase.firestore.FieldValue.increment(1)
-                });
-                break;
-            case 'birthday':
-                for (const pid of this.gameState.turnOrder) {
-                    if (pid !== playerId) {
-                        await this.updatePlayerMoney(pid, -card.amount);
-                    }
-                }
-                await this.updatePlayerMoney(playerId, card.amount * (this.gameState.turnOrder.length - 1));
-                break;
-            case 'repair':
-                const houses = Object.values(this.gameState.boardState || {})
-                    .filter(c => c.owner === playerId)
-                    .reduce((sum, c) => sum + (c.houses || 0), 0);
-                await this.updatePlayerMoney(playerId, -houses * card.perHouse);
-                break;
-        }
-    }
-
-    async sendToJail(playerId) {
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${playerId}.position`]: 10,
-            [`players.${playerId}.inJail`]: true,
-            [`players.${playerId}.jailTurns`]: 3,
-            [`players.${playerId}.doubles`]: 0
-        });
-        await this.addToLog(`${this.gameState.players[playerId].name} отправляется в тюрьму!`);
-    }
-
-    async payJailFine(playerId) {
-        await this.updatePlayerMoney(playerId, -50);
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${playerId}.inJail`]: false,
-            [`players.${playerId}.jailTurns`]: 0
-        });
-        await this.addToLog(`${this.gameState.players[playerId].name} заплатил 50 за выход из тюрьмы`);
-    }
-
-    async useJailCard(playerId) {
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${playerId}.inJail`]: false,
-            [`players.${playerId}.jailTurns`]: 0,
-            [`players.${playerId}.jailCards`]: firebase.firestore.FieldValue.increment(-1)
-        });
-        await this.addToLog(`${this.gameState.players[playerId].name} использовал карту выхода из тюрьмы`);
-    }
-
-    async endTurn() {
-        const currentPlayerId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        const player = this.gameState.players[currentPlayerId];
-
-        // Сброс дублей
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${currentPlayerId}.doubles`]: 0
-        });
-
-        // Проверка банкротства
-        if (player.money < 0) {
-            await this.handleBankruptcy(currentPlayerId);
-        }
-
-        // Следующий игрок
-        let nextPlayer = (this.gameState.currentPlayer + 1) % this.gameState.turnOrder.length;
-
-        // Пропускаем банкротов
-        while (this.gameState.players[this.gameState.turnOrder[nextPlayer]]?.bankrupt) {
-            nextPlayer = (nextPlayer + 1) % this.gameState.turnOrder.length;
-        }
-
-        // Увеличиваем раунд
-        let round = this.gameState.round;
-        if (nextPlayer === 0) round++;
-
-        await db.collection('games').doc(this.gameId).update({
-            currentPlayer: nextPlayer,
-            round: round,
-            lastRoll: null
-        });
-
-        // Проверка конца игры
-        if (round > this.gameState.maxRounds) {
-            await this.endGame();
-        }
-    }
-
-    async handleBankruptcy(playerId) {
-        const player = this.gameState.players[playerId];
-        const boardState = this.gameState.boardState || {};
-
-        // Отдаём всё банку (простая версия)
-        for (const cellId of player.properties) {
-            delete boardState[cellId];
-        }
-
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${playerId}.bankrupt`]: true,
-            [`players.${playerId}.money`]: 0,
-            [`players.${playerId}.properties`]: [],
-            boardState: boardState
-        });
-        await this.addToLog(`${player.name} объявлен банкротом!`);
-    }
-
-    async endGame() {
-        const players = Object.values(this.gameState.players);
-        const winner = players.reduce((best, p) => 
-            !p.bankrupt && p.money > best.money ? p : best, players[0]
-        );
-
-        await db.collection('games').doc(this.gameId).update({
-            status: 'finished',
-            winner: winner.id,
-            finishedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        await this.addToLog(`🏆 Игра окончена! Победитель: ${winner.name} с ${winner.money}!`);
-    }
-
-    async updatePlayerMoney(playerId, amount) {
-        await db.collection('games').doc(this.gameId).update({
-            [`players.${playerId}.money`]: firebase.firestore.FieldValue.increment(amount)
-        });
-    }
-
-    async addToLog(message) {
-        await db.collection('games').doc(this.gameId).update({
-            chat: firebase.firestore.FieldValue.arrayUnion({
-                text: message,
-                time: Date.now(),
-                system: true
-            })
-        });
-    }
-
-    async sendChat(message) {
-        if (!this.gameId || !this.playerId) return;
-        await db.collection('games').doc(this.gameId).update({
-            chat: firebase.firestore.FieldValue.arrayUnion({
-                text: message,
-                playerId: this.playerId,
-                playerName: this.gameState?.players[this.playerId]?.name || 'Игрок',
-                time: Date.now(),
-                system: false
-            })
-        });
-    }
-
-    shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    }
-
-    getMyPlayer() {
-        if (!this.gameState || !this.playerId) return null;
-        return this.gameState.players[this.playerId];
-    }
-
-    isMyTurn() {
-        if (!this.gameState || !this.playerId) return false;
-        const currentId = this.gameState.turnOrder[this.gameState.currentPlayer];
-        return currentId === this.playerId;
+    } else {
+        // Демо-режим
+        showRoomInfo(roomId);
+        addBotPlayers(1);
+        updatePlayersPanel();
     }
 }
 
-window.monopolyGame = new MonopolyGame();
+function generatePlayerId() {
+    return 'p_' + Math.random().toString(36).substring(2, 10);
+}
+
+function createPlayer(id, name, isMe = false) {
+    return {
+        id: id,
+        name: name,
+        avatar: isMe ? '👤' : ['🐶', '🐱', '🦊', '🐼'][Math.floor(Math.random() * 4)],
+        color: ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b'][gameState.players.length % 4],
+        money: START_MONEY,
+        position: 0,
+        inJail: false,
+        jailTurns: 0,
+        properties: [],
+        isBot: !isMe && name !== 'Вы',
+        isMe: isMe
+    };
+}
+
+function showRoomInfo(roomId) {
+    document.getElementById('room-info')?.classList.remove('hidden');
+    document.getElementById('room-id')?.textContent && (document.getElementById('room-id').textContent = roomId);
+}
+
+function copyRoomId() {
+    const roomId = document.getElementById('room-id')?.textContent;
+    if (roomId) {
+        navigator.clipboard.writeText(roomId).then(() => {
+            showToast('ID скопирован!');
+        });
+    }
+}
+
+function listenToRoom(roomId) {
+    if (!window.db) return;
+
+    if (roomUnsubscribe) roomUnsubscribe();
+
+    roomUnsubscribe = window.db.collection('games').doc(roomId)
+        .onSnapshot(doc => {
+            if (!doc.exists) return;
+            const data = doc.data();
+            gameState.players = data.players || [];
+            gameState.currentPlayer = data.currentPlayer || 0;
+            gameState.round = data.round || 1;
+            gameState.board = data.board || [];
+
+            updatePlayersPanel();
+            updateGameUI();
+
+            if (data.status === 'playing' && document.getElementById('screen-game')?.classList.contains('active') === false) {
+                showScreen('screen-game');
+                initBoard();
+                updatePlayersPanel();
+            }
+        });
+}
+
+// ============ ПРИСОЕДИНЕНИЕ К КОМНАТЕ ============
+function joinRoom() {
+    const roomId = document.getElementById('join-room-id')?.value?.toUpperCase().trim();
+    if (!roomId || roomId.length !== 6) {
+        showToast('Введите корректный ID комнаты');
+        return;
+    }
+
+    gameState.roomId = roomId;
+    gameState.myId = generatePlayerId();
+
+    if (window.db) {
+        window.db.collection('games').doc(roomId).get().then(doc => {
+            if (!doc.exists) {
+                showToast('Комната не найдена');
+                return;
+            }
+
+            const data = doc.data();
+            if (data.players.length >= 4) {
+                showToast('Комната заполнена');
+                return;
+            }
+
+            const player = createPlayer(gameState.myId, 'Игрок ' + (data.players.length + 1));
+            data.players.push(player);
+
+            return window.db.collection('games').doc(roomId).update({
+                players: data.players
+            });
+        }).then(() => {
+            listenToRoom(roomId);
+            showScreen('screen-create');
+            showRoomInfo(roomId);
+            document.querySelector('.create-form')?.classList.add('hidden');
+        }).catch(err => {
+            console.error('Error joining room:', err);
+            showToast('Ошибка присоединения');
+        });
+    } else {
+        // Демо
+        showScreen('screen-game');
+        initBoard();
+        addBotPlayers(3);
+        updatePlayersPanel();
+        startGameLoop();
+    }
+}
+
+// ============ БОТЫ ============
+function addBotPlayers(count) {
+    const botNames = ['Влад', 'Настя', 'Денис', 'Оля', 'Макс', 'Катя'];
+    for (let i = 0; i < count; i++) {
+        const bot = createPlayer(generatePlayerId(), botNames[i] || 'Бот ' + (i + 1));
+        bot.isBot = true;
+        gameState.players.push(bot);
+    }
+}
+
+// ============ НАЧАЛО ИГРЫ ============
+function startGame() {
+    if (!gameState.isHost) return;
+
+    if (window.db) {
+        window.db.collection('games').doc(gameState.roomId).update({
+            status: 'playing',
+            startedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } else {
+        showScreen('screen-game');
+        initBoard();
+        updatePlayersPanel();
+        startGameLoop();
+    }
+}
+
+// ============ БРОСОК КУБИКОВ ============
+function rollDice() {
+    if (gameState.gameOver) return;
+
+    const currentPlayer = gameState.players[gameState.currentPlayer];
+    if (!currentPlayer.isMe && !currentPlayer.isBot) return;
+
+    const btn = document.getElementById('btn-go');
+    if (btn) btn.disabled = true;
+
+    // Анимация кубиков
+    let rolls = 0;
+    const maxRolls = 10;
+    const interval = setInterval(() => {
+        const d1 = Math.floor(Math.random() * 6) + 1;
+        const d2 = Math.floor(Math.random() * 6) + 1;
+        updateDiceDisplay(d1, d2);
+        rolls++;
+        if (rolls >= maxRolls) {
+            clearInterval(interval);
+            finalizeRoll();
+        }
+    }, 100);
+}
+
+function updateDiceDisplay(d1, d2) {
+    const dice1 = document.getElementById('dice1');
+    const dice2 = document.getElementById('dice2');
+    if (dice1) dice1.textContent = getDiceEmoji(d1);
+    if (dice2) dice2.textContent = getDiceEmoji(d2);
+}
+
+function getDiceEmoji(n) {
+    return ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][n - 1];
+}
+
+function finalizeRoll() {
+    const d1 = Math.floor(Math.random() * 6) + 1;
+    const d2 = Math.floor(Math.random() * 6) + 1;
+    gameState.dice = [d1, d2];
+    updateDiceDisplay(d1, d2);
+
+    const isDouble = d1 === d2;
+    const currentPlayer = gameState.players[gameState.currentPlayer];
+
+    if (currentPlayer.inJail) {
+        if (isDouble) {
+            currentPlayer.inJail = false;
+            currentPlayer.jailTurns = 0;
+            showToast('Дубль! Вы выходите из тюрьмы');
+        } else {
+            currentPlayer.jailTurns++;
+            if (currentPlayer.jailTurns >= 3) {
+                currentPlayer.inJail = false;
+                currentPlayer.jailTurns = 0;
+                currentPlayer.money -= 50;
+                showToast('Заплатили $50 и вышли из тюрьмы');
+            } else {
+                showToast('В тюрьме. Пропуск хода.');
+                nextTurn();
+                return;
+            }
+        }
+    }
+
+    if (isDouble) {
+        gameState.doublesCount++;
+        if (gameState.doublesCount >= 3) {
+            showToast('3 дубля подряд! В тюрьму!');
+            sendToJail(currentPlayer);
+            gameState.doublesCount = 0;
+            nextTurn();
+            return;
+        }
+    } else {
+        gameState.doublesCount = 0;
+    }
+
+    movePlayer(currentPlayer, d1 + d2);
+
+    if (!isDouble) {
+        setTimeout(() => nextTurn(), 1500);
+    } else {
+        showToast('Дубль! Ещё ход!');
+        if (btn) btn.disabled = false;
+    }
+}
+
+function movePlayer(player, steps) {
+    const oldPos = player.position;
+    player.position = (player.position + steps) % BOARD_SIZE;
+
+    // Прошли СТАРТ
+    if (player.position < oldPos && oldPos + steps >= BOARD_SIZE) {
+        player.money += PASS_GO_MONEY;
+        showToast(`${player.name} прошёл СТАРТ и получил $${PASS_GO_MONEY}`);
+    }
+
+    updatePlayerToken(player);
+
+    setTimeout(() => {
+        handleCellLanding(player);
+    }, 500);
+}
+
+function updatePlayerToken(player) {
+    // Удаляем старую фишку
+    const oldToken = document.querySelector(`.player-token[data-player="${player.id}"]`);
+    if (oldToken) oldToken.remove();
+
+    // Находим клетку
+    const cell = document.querySelector(`.cell[data-cell-id="${player.position}"]`);
+    if (!cell) return;
+
+    // Создаём фишку
+    const token = document.createElement('div');
+    token.className = 'player-token';
+    token.dataset.player = player.id;
+    token.style.backgroundColor = player.color;
+    token.style.borderColor = '#fff';
+    token.textContent = player.avatar;
+
+    // Смещаем если несколько игроков на одной клетке
+    const sameCell = gameState.players.filter(p => p.position === player.position);
+    const index = sameCell.findIndex(p => p.id === player.id);
+    const offset = index * 8;
+
+    token.style.left = `${parseInt(cell.style.left) + 7 + offset}px`;
+    token.style.top = `${parseInt(cell.style.top) + 7}px`;
+
+    document.getElementById('game-board')?.appendChild(token);
+}
+
+// ============ ОБРАБОТКА КЛЕТКИ ============
+function handleCellLanding(player) {
+    const cell = BOARD_CELLS[player.position];
+
+    switch (cell.type) {
+        case CELL_TYPES.PROPERTY:
+        case CELL_TYPES.RAILROAD:
+        case CELL_TYPES.UTILITY:
+            handleProperty(player, cell);
+            break;
+        case CELL_TYPES.CHANCE:
+            drawChanceCard(player);
+            break;
+        case CELL_TYPES.CHEST:
+            drawChestCard(player);
+            break;
+        case CELL_TYPES.TAX:
+            player.money -= cell.price;
+            showToast(`${player.name} заплатил налог $${cell.price}`);
+            break;
+        case CELL_TYPES.GO_TO_JAIL:
+            sendToJail(player);
+            break;
+        case CELL_TYPES.FREE:
+            showToast(`${player.name} на бесплатной парковке`);
+            break;
+        case CELL_TYPES.JAIL:
+            showToast(`${player.name} посетил тюрьму`);
+            break;
+    }
+
+    updatePlayersPanel();
+
+    if (player.money <= 0) {
+        bankrupt(player);
+    }
+}
+
+function handleProperty(player, cell) {
+    const boardCell = gameState.board[player.position];
+    if (!boardCell) return;
+
+    if (boardCell.owner === null) {
+        // Можно купить
+        if (player.isMe) {
+            showBuyDialog(player, cell);
+        } else if (player.isBot) {
+            // Бот покупает если хватает денег
+            if (player.money >= cell.price * 1.5) {
+                buyProperty(player, player.position);
+            }
+        }
+    } else if (boardCell.owner !== player.id) {
+        // Заплатить аренду
+        const owner = gameState.players.find(p => p.id === boardCell.owner);
+        if (owner) {
+            const rent = calculateRent(cell, boardCell.houses);
+            player.money -= rent;
+            owner.money += rent;
+            showToast(`${player.name} заплатил аренду $${rent} игроку ${owner.name}`);
+        }
+    }
+}
+
+function calculateRent(cell, houses) {
+    let base = cell.price / 10;
+    if (houses > 0) base *= (1 + houses * 0.5);
+    return Math.floor(base);
+}
+
+function showBuyDialog(player, cell) {
+    const buy = confirm(`Купить ${cell.name} за $${cell.price}?`);
+    if (buy) {
+        buyProperty(player, player.position);
+    }
+}
+
+function buyProperty(player, cellIndex) {
+    const cell = BOARD_CELLS[cellIndex];
+    if (player.money < cell.price) {
+        showToast('Недостаточно денег');
+        return;
+    }
+
+    player.money -= cell.price;
+    player.properties.push(cellIndex);
+    if (gameState.board[cellIndex]) {
+        gameState.board[cellIndex].owner = player.id;
+    }
+
+    showToast(`${player.name} купил ${cell.name}`);
+    updatePlayersPanel();
+
+    if (window.db) {
+        window.db.collection('games').doc(gameState.roomId).update({
+            players: gameState.players,
+            board: gameState.board
+        });
+    }
+}
+
+// ============ КАРТЫ ============
+function drawChanceCard(player) {
+    const card = CHANCE_CARDS[Math.floor(Math.random() * CHANCE_CARDS.length)];
+    showToast(`Шанс: ${card.text}`);
+
+    switch (card.action) {
+        case 'move':
+            player.position = card.target;
+            updatePlayerToken(player);
+            handleCellLanding(player);
+            break;
+        case 'money':
+            player.money += card.amount;
+            break;
+        case 'jail':
+            sendToJail(player);
+            break;
+        case 'nearest':
+            // Найти ближайшую Ж/д
+            let nearest = 0;
+            let minDist = 999;
+            BOARD_CELLS.forEach((c, i) => {
+                if (c.type === CELL_TYPES.RAILROAD) {
+                    const dist = Math.abs(i - player.position);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = i;
+                    }
+                }
+            });
+            player.position = nearest;
+            updatePlayerToken(player);
+            handleCellLanding(player);
+            break;
+    }
+}
+
+function drawChestCard(player) {
+    const card = CHEST_CARDS[Math.floor(Math.random() * CHEST_CARDS.length)];
+    showToast(`Казна: ${card.text}`);
+
+    if (card.action === 'money') {
+        player.money += card.amount;
+    } else if (card.action === 'birthday') {
+        gameState.players.forEach(p => {
+            if (p.id !== player.id) {
+                p.money -= card.amount;
+                player.money += card.amount;
+            }
+        });
+    }
+}
+
+// ============ ТЮРЬМА ============
+function sendToJail(player) {
+    player.position = 10; // Тюрьма
+    player.inJail = true;
+    player.jailTurns = 0;
+    showToast(`${player.name} отправлен в тюрьму!`);
+    updatePlayerToken(player);
+}
+
+// ============ БАНКРОТСТВО ============
+function bankrupt(player) {
+    player.money = 0;
+    player.properties.forEach(propIndex => {
+        if (gameState.board[propIndex]) {
+            gameState.board[propIndex].owner = null;
+            gameState.board[propIndex].houses = 0;
+        }
+    });
+    player.properties = [];
+    showToast(`${player.name} обанкротился!`);
+
+    const activePlayers = gameState.players.filter(p => p.money > 0);
+    if (activePlayers.length <= 1) {
+        endGame(activePlayers[0]);
+    }
+}
+
+// ============ СЛЕДУЮЩИЙ ХОД ============
+function nextTurn() {
+    gameState.currentPlayer = (gameState.currentPlayer + 1) % gameState.players.length;
+
+    // Проверяем новый раунд
+    if (gameState.currentPlayer === 0) {
+        gameState.round++;
+        document.getElementById('current-round') && (document.getElementById('current-round').textContent = String(gameState.round).padStart(2, '0'));
+
+        if (gameState.round > MAX_ROUNDS) {
+            endGameByAssets();
+            return;
+        }
+    }
+
+    updatePlayersPanel();
+
+    const currentPlayer = gameState.players[gameState.currentPlayer];
+    const btn = document.getElementById('btn-go');
+
+    if (currentPlayer.isMe || currentPlayer.isBot) {
+        if (btn) btn.disabled = false;
+        if (currentPlayer.isBot) {
+            setTimeout(() => rollDice(), 1000);
+        }
+    } else {
+        if (btn) btn.disabled = true;
+    }
+
+    if (window.db) {
+        window.db.collection('games').doc(gameState.roomId).update({
+            currentPlayer: gameState.currentPlayer,
+            round: gameState.round,
+            players: gameState.players
+        });
+    }
+}
+
+// ============ КОНЕЦ ИГРЫ ============
+function endGame(winner) {
+    gameState.gameOver = true;
+    showToast(`🏆 Победитель: ${winner.name}!`);
+    if (window.db) {
+        window.db.collection('games').doc(gameState.roomId).update({
+            status: 'finished',
+            winner: winner.id
+        });
+    }
+}
+
+function endGameByAssets() {
+    gameState.gameOver = true;
+    let maxAssets = -1;
+    let winner = null;
+
+    gameState.players.forEach(p => {
+        const assets = p.money + p.properties.reduce((sum, prop) => sum + BOARD_CELLS[prop].price, 0);
+        if (assets > maxAssets) {
+            maxAssets = assets;
+            winner = p;
+        }
+    });
+
+    endGame(winner);
+}
+
+// ============ ОБНОВЛЕНИЕ UI ============
+function updatePlayersPanel() {
+    const panel = document.getElementById('players-panel');
+    if (!panel) return;
+
+    panel.innerHTML = '';
+    gameState.players.forEach((player, index) => {
+        const card = document.createElement('div');
+        card.className = 'player-card';
+        if (index === gameState.currentPlayer) {
+            card.style.animation = 'pulse 1s infinite';
+        }
+
+        card.innerHTML = `
+            <div class="player-avatar" style="border-color: ${player.color}">
+                ${player.avatar}
+            </div>
+            <span class="player-name">${player.name}</span>
+            <span class="player-balance" style="background: ${player.color}">
+                ${player.money}
+            </span>
+        `;
+
+        panel.appendChild(card);
+    });
+}
+
+function updateGameUI() {
+    document.getElementById('current-round') && (document.getElementById('current-round').textContent = String(gameState.round).padStart(2, '0'));
+}
+
+// ============ ИГРОВОЙ ЦИКЛ ============
+function startGameLoop() {
+    updatePlayersPanel();
+    const btn = document.getElementById('btn-go');
+    if (btn) btn.disabled = false;
+}
+
+// ============ УТИЛИТЫ ============
+function showToast(message) {
+    const toast = document.getElementById('game-toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId)?.classList.add('active');
+}
+
+function showMenu() {
+    showScreen('screen-menu');
+    if (roomUnsubscribe) {
+        roomUnsubscribe();
+        roomUnsubscribe = null;
+    }
+}
+
+function showGameModes() {
+    showScreen('screen-create');
+}
+
+function startCasual() {
+    showScreen('screen-create');
+}
+
+function createGame() {
+    showScreen('screen-create');
+}
+
+function searchGame() {
+    showScreen('screen-join');
+}
+
+function showRules() {
+    document.getElementById('modal-rules')?.classList.add('active');
+}
+
+function closeRules() {
+    document.getElementById('modal-rules')?.classList.remove('active');
+}
+
+function showSkins() {
+    showToast('Скины скоро будут доступны!');
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.rules-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById(tabId)?.classList.remove('hidden');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+function setPlayers(n) {
+    document.querySelectorAll('.player-selector button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+function setBet(n) {
+    document.querySelectorAll('.bet-selector button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+// ============ ЧАТ ============
+function sendChat(e) {
+    if (e.key !== 'Enter') return;
+    const input = document.getElementById('chat-input');
+    const message = input?.value.trim();
+    if (!message) return;
+
+    addChatMessage('Вы', message, true);
+    input.value = '';
+
+    if (window.db && gameState.roomId) {
+        window.db.collection('games').doc(gameState.roomId).collection('chat').add({
+            player: gameState.myId,
+            name: 'Вы',
+            message: message,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+}
+
+function addChatMessage(name, message, isOwn = false) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble' + (isOwn ? ' own' : '');
+    bubble.textContent = `${name}: ${message}`;
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+}
+
+// ============ ДЕМО-РЕЖИМ ============
+function initDemo() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('demo') === '1') {
+        gameState.myId = generatePlayerId();
+        const me = createPlayer(gameState.myId, 'Вы', true);
+        me.avatar = '👤';
+        gameState.players = [me];
+        addBotPlayers(3);
+
+        showScreen('screen-game');
+        initBoard();
+
+        // Размещаем фишки
+        gameState.players.forEach(p => updatePlayerToken(p));
+        updatePlayersPanel();
+        startGameLoop();
+
+        // Демо-сообщения в чат
+        setTimeout(() => addChatMessage('Влад', 'Hello all, I'm joining you!'), 500);
+        setTimeout(() => addChatMessage('Настя', 'Hello all, I'm joining you!'), 1000);
+    }
+}
+
+// ============ ИНИЦИАЛИЗАЦИЯ ============
+document.addEventListener('DOMContentLoaded', () => {
+    initDemo();
+});

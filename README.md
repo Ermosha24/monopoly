@@ -1,15 +1,30 @@
-# 🎲 TopTop Monopoly
+# TopTop Monopoly
 
-Telegram Mini App — космическая монополия с мультиплеером через Firebase.
+Telegram Mini App — игра Монополия для 2-4 игроков с мультиплеером через Firebase.
 
-## 🚀 Быстрый старт
+## 🎮 Особенности
 
-### 1. Firebase настройка
-- Откройте [Firebase Console](https://console.firebase.google.com/)
-- Проект уже создан: `monopoly-a1d82`
-- Убедитесь, что Firestore Database включён (режим тестовый)
+- **28 клеток** поля (как в референсе)
+- **Мультиплеер** через Firebase Firestore
+- **28 раундов**, победа по активам
+- **2 кубика**, дубли = ещё ход, 3 дубля = тюрьма
+- **Банкротство** — активы обнуляются
+- **16 карт Шанс + 16 карт Казна**
+- **Чат** в реальном времени
+- **Таймер хода**
+- **Покупка/аренда/постройка домов**
 
-### 2. Firestore Rules (временно для теста)
+## 🚀 Деплой
+
+### 1. GitHub Pages
+1. Залейте файлы на GitHub
+2. Settings → Pages → Source: main / (root)
+3. Подождите 2-5 минут
+
+### 2. Firebase
+1. Откройте Firebase Console
+2. Создайте Firestore Database
+3. Правила (временно для теста):
 ```
 rules_version = '2';
 service cloud.firestore {
@@ -21,46 +36,33 @@ service cloud.firestore {
 }
 ```
 
-### 3. GitHub Pages
-```bash
-git init
-git add .
-git commit -m "TopTop Monopoly initial"
-git remote add origin https://github.com/Ermosh24/monopoly.git
-git push -u origin main
-```
-
-Затем в репозитории: **Settings → Pages → Source: Deploy from branch → main → / (root)**
-
-### 4. Telegram Bot
-- @BotFather → /newbot
-- /setmenubutton → URL вашего GitHub Pages
-
-## 🎮 Демо-режим
-Откройте: `index.html?demo=1` (без Telegram)
+### 3. Telegram Bot
+1. @BotFather → /setmenubutton
+2. URL: `https://yourname.github.io/monopoly/`
 
 ## 📁 Структура
+
 ```
 monopoly/
 ├── index.html          # Главная страница
 ├── css/
-│   └── style.css       # Стили
+│   └── style.css       # Стили + анимации
 └── js/
     ├── firebase-config.js  # Firebase конфиг
-    ├── auth.js             # Авторизация
     ├── game.js             # Игровой движок
-    └── ui.js               # Интерфейс
+    └── ui.js               # UI функции
 ```
 
-## ✅ Реализовано
-- 40 клеток поля (28 основных + специальные)
-- 28 раундов, победа по активам
-- 2 кубика, дубли = ещё ход, 3 дубля = тюрьма
-- Банкротство
-- 7 скинов фишек
-- 1-4 игрока (мультиплеер + боты)
-- Чат в реальном времени
-- Таймер хода (30 сек)
-- Покупка/аренда/постройка домов
-- 16 карт Шанс + 16 карт Казна
-- Тюрьма с 3 способами выхода
+## 🧪 Тест
+
+Откройте в браузере:
+```
+https://yourname.github.io/monopoly/?demo=1
+```
+
+## 🔧 Технологии
+
+- HTML5 + CSS3 (градиенты, тени, анимации)
+- Vanilla JavaScript (ES6+)
+- Firebase (Firestore, Auth)
+- GitHub Pages (хостинг)
