@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TopTop Monopoly</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-logo">🎲</div>
+        <h1 class="auth-title">TopTop Monopoly</h1>
+        <p class="auth-subtitle">Космическая монополия для Telegram</p>
+        <div class="loading-spinner"></div>
+        <p style="color: rgba(255,255,255,0.6); font-size: 14px;">Подключение...</p>
+    </div>
+
+    <!-- Menu Screen -->
+    <div id="menu-screen" class="screen hidden">
+        <div class="menu-header">
+            <h1>🎲 TopTop Monopoly</h1>
+            <p>Классическая монополия в Telegram</p>
+        </div>
+
+        <div class="player-setup">
+            <div class="input-group">
+                <label>Ваше имя</label>
+                <input type="text" id="player-name" placeholder="Введите имя" maxlength="20">
+            </div>
+
+            <div class="input-group">
+                <label>Выберите фишку</label>
+                <div class="skin-selector" id="skin-selector"></div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-create">🚀 Создать игру</button>
+        <button class="btn btn-secondary" id="btn-join">🔗 Присоединиться</button>
+        <button class="btn btn-accent" id="btn-rules">📖 Правила</button>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen hidden">
+        <div class="lobby-header">
+            <h2>🎮 Лобби</h2>
+            <p>ID игры:</p>
+            <div class="game-id-display" id="lobby-game-id">---</div>
+            <p style="font-size: 12px; color: #999; margin-top: 8px;">Поделитесь ID с друзьями</p>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">Игроки</div>
+            <div class="lobby-players" id="lobby-players"></div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-start-game">▶️ Начать игру</button>
+        <button class="btn btn-secondary" id="btn-add-bot">🤖 Добавить бота</button>
+        <button class="btn btn-danger" id="btn-leave-lobby">🚪 Выйти</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen hidden">
+        <div class="game-board-container">
+            <div class="game-board" id="game-board"></div>
+            <div id="dice-animation" class="hidden"></div>
+        </div>
+
+        <div class="side-panel">
+            <!-- Turn Info -->
+            <div class="panel">
+                <div class="turn-info" id="turn-info">
+                    <div class="turn-badge">Раунд 1/28</div>
+                    <div class="current-player">Ожидание...</div>
+                </div>
+                <div id="turn-timer"></div>
+            </div>
+
+            <!-- Players -->
+            <div class="panel">
+                <div class="panel-title">Игроки</div>
+                <div id="players-panel"></div>
+            </div>
+
+            <!-- Controls -->
+            <div class="panel">
+                <div class="panel-title">Управление</div>
+                <div class="controls">
+                    <button class="btn btn-primary" id="btn-roll">🎲 Бросить кубики</button>
+                    <button class="btn btn-gold" id="btn-buy" style="display:none">💰 Купить</button>
+                    <button class="btn btn-secondary" id="btn-skip-buy" style="display:none">❌ Пропустить</button>
+                    <button class="btn btn-accent" id="btn-build" style="display:none">🏠 Построить дом</button>
+                    <button class="btn btn-primary" id="btn-end-turn" style="display:none">✅ Закончить ход</button>
+                    <button class="btn btn-danger" id="btn-pay-jail" style="display:none">💸 Заплатить 50</button>
+                    <button class="btn btn-secondary" id="btn-use-card" style="display:none">🎫 Карта выхода</button>
+                </div>
+            </div>
+
+            <!-- Chat -->
+            <div class="panel">
+                <div class="panel-title">💬 Чат</div>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input-group">
+                        <input type="text" id="chat-input" placeholder="Сообщение..." maxlength="100">
+                        <button id="btn-chat-send">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="screen hidden">
+        <div class="winner-trophy">🏆</div>
+        <h1>Игра окончена!</h1>
+        <p id="winner-name" style="font-size: 24px; font-weight: 700; color: var(--gold); margin: 15px 0;">Победитель</p>
+        <button class="btn btn-primary" onclick="location.reload()">🔄 Новая игра</button>
+    </div>
+
+    <!-- Buy Dialog -->
+    <div id="buy-dialog" class="hidden">
+        <div class="buy-dialog-content">
+            <h3>🏠 Покупка имущества</h3>
+            <div id="buy-property-name" style="font-size: 18px; font-weight: 600;"></div>
+            <div class="price" id="buy-property-price"></div>
+            <div id="buy-property-rent" style="color: #999;"></div>
+            <div class="buy-dialog-buttons">
+                <button class="btn btn-primary" id="btn-buy-confirm">💰 Купить</button>
+                <button class="btn btn-secondary" id="btn-buy-cancel">❌ Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="hidden"></div>
+
+    <!-- Scripts -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            authManager.init();
+            uiManager.init();
+        });
+    </script>
+</body>
+</html>
